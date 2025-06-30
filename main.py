@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 # Load Excel file
-df = pd.read_excel("sales_pipeline.xlsx")
+df = pd.read_excel("sales_pipeline.csv")
 df.fillna("", inplace=True)
 
 @app.get("/api/data")
