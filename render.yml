@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: flask-api
+    name: CRM-Sales-Opportunities_Sales-Pipeline
     env: python
     buildCommand: ""
     startCommand: gunicorn app:app
