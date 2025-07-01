@@ -3,6 +3,8 @@ import pandas as pd
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Load Excel data once at startup
 df = pd.read_csv("sales_pipeline.csv")
