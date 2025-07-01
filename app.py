@@ -1,30 +1,64 @@
-from fastapi import FastAPI, Query
+from flask import Flask, request, jsonify, abort
 import pandas as pd
-from fastapi.responses import JSONResponse
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
-app = FastAPI()
+# Load Excel data once at startup
+df = pd.read_excel("sales_pipeline.csv")
+data = df.to_dict(orient="records")
 
-# Load CSV file instead of Excel
-df = pd.read_csv("sales_pipeline.csv")
-df.fillna("", inplace=True)
+app = Flask(__name__)
 
-@app.get("/api/data")
-def get_data(page: int = Query(1, ge=1), limit: int = Query(100, le=1000)):
-    start = (page - 1) * limit
-    end = start + limit
-    total = len(df)
-    data = df.iloc[start:end].to_dict(orient="records")
+# Set your API Key (secure it via environment variable in production)
+API_KEY = "your-secret-token"
 
-    return {
+# Rate limiting: 100 requests per hour per IP
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["100 per hour"]
+)
+
+# Auth check for /items endpoint only
+@app.before_request
+def check_auth():
+    if request.endpoint == "get_items":
+        token = request.headers.get("Authorization")
+        if token != f"Bearer {API_KEY}":
+            abort(401, description="Unauthorized")
+
+@app.route("/items")
+def get_items():
+    try:
+        page = int(request.args.get("page", 1))  # Default to page 1
+        if page < 1:
+            raise ValueError
+    except ValueError:
+        return jsonify({"error": "Invalid page number"}), 400
+
+    per_page = 1000  # Fixed records per page
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_data = data[start:end]
+
+    return jsonify({
         "page": page,
-        "limit": limit,
-        "total_records": total,
-        "data": data
-    }
+        "per_page": per_page,
+        "total": len(data),
+        "data": paginated_data
+    })
 
-    return {
-        "page": page,
-        "limit": limit,
-        "total_records": total,
-        "data": data
-    }
+# Error handler: Unauthorized
+@app.errorhandler(401)
+def unauthorized(e):
+    return jsonify({"error": str(e)}), 401
+
+# Error handler: Rate limit exceeded
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({"error": "Rate limit exceeded"}), 429
+
+if __name__ == "__main__":
+    app.run()
+
