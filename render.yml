@@ -3,4 +3,4 @@ services:
     name: flask-api
     env: python
     buildCommand: ""
-    startCommand: gunicorn app:app
+    startCommand: "gunicorn app:app"
