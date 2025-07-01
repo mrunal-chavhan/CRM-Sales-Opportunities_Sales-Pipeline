@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, abort
 import pandas as pd
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import os
 
 # Load Excel data once at startup
 df = pd.read_csv("sales_pipeline.csv")
@@ -10,7 +11,8 @@ data = df.to_dict(orient="records")
 app = Flask(__name__)
 
 # Set your API Key (secure it via environment variable in production)
-API_KEY = "your-secret-token"
+
+API_KEY = os.getenv("API_KEY", "default-fallback-token")
 
 # Rate limiting: 100 requests per hour per IP
 limiter = Limiter(
