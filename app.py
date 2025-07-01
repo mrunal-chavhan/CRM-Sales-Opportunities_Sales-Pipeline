@@ -4,7 +4,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 # Load Excel data once at startup
-df = pd.read_excel("sales_pipeline.csv")
+df = pd.read_csv("sales_pipeline.csv")
 data = df.to_dict(orient="records")
 
 app = Flask(__name__)
