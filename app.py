@@ -131,9 +131,8 @@ def get_items():
     filtered_data = []
     for row in data:
         engage_date = row.get("engage_date")
-
-        # Include nulls
-        if not engage_date:
+        ##include nulls
+       if engage_date is None or str(engage_date).strip() == "" or str(engage_date).strip().lower() == "nan":
             if include_nulls:
                 filtered_data.append(row)
             continue
