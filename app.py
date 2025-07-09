@@ -86,26 +86,27 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables
+# Load environment variables from .env
 load_dotenv()
 
 # Load CSV data once at startup
 df = pd.read_csv("sales_pipeline.csv")
 data = df.to_dict(orient="records")
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# API Key from .env or fallback
+# API Key from .env or fallback default
 API_KEY = os.getenv("API_KEY", "default-fallback-token")
 
-# Rate limiter (100 requests/hour/IP)
+# Rate limiter: 100 requests/hour per IP
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["100 per hour"]
 )
 
-# Auth for /items only
+# Auth check for /items endpoint only
 @app.before_request
 def check_auth():
     if request.endpoint == "get_items":
@@ -113,6 +114,7 @@ def check_auth():
         if token != f"Bearer {API_KEY}":
             abort(401, description="Unauthorized")
 
+# Route to serve paginated and filtered data
 @app.route("/items")
 def get_items():
     try:
@@ -122,22 +124,28 @@ def get_items():
     except ValueError:
         return jsonify({"error": "Invalid page number"}), 400
 
-    # Optional query parameters
+    # Query parameters: optional
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
     include_nulls = request.args.get("include_nulls", "false").lower() == "true"
 
-    # Filtering based on engage_date
     filtered_data = []
+
+    # Filter based on engage_date
     for row in data:
         engage_date = row.get("engage_date")
-        ##include nulls
-       if engage_date is None or str(engage_date).strip() == "" or str(engage_date).strip().lower() == "nan":
+
+        # Include nulls (blank, whitespace, "NaN", None)
+        if (
+            engage_date is None or
+            str(engage_date).strip() == "" or
+            str(engage_date).strip().lower() == "nan"
+        ):
             if include_nulls:
                 filtered_data.append(row)
             continue
 
-        # Apply date range if specified
+        # Filter by date range if provided
         if start_date and end_date:
             try:
                 engage_dt = datetime.strptime(engage_date, "%Y-%m-%d")
@@ -145,18 +153,19 @@ def get_items():
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")
                 if start_dt <= engage_dt <= end_dt:
                     filtered_data.append(row)
-            except Exception as e:
-                continue  # Skip if date parsing fails
+            except Exception:
+                continue  # Skip row if date is invalid
         elif not start_date and not end_date and not include_nulls:
-            # No filtering – load all non-null rows
+            # Include all non-null engage_date rows if no filter applied
             filtered_data.append(row)
 
-    # Paginate
+    # Pagination logic
     per_page = 1000
     start = (page - 1) * per_page
     end = start + per_page
     paginated_data = filtered_data[start:end]
 
+    # Build next page URL if more data is available
     has_more = end < len(filtered_data)
     next_page_url = None
     if has_more:
@@ -165,6 +174,7 @@ def get_items():
         query_params['page'] = page + 1
         next_page_url = f"{base_url}?{'&'.join(f'{k}={v}' for k, v in query_params.items())}"
 
+    # Return response
     return jsonify({
         "page": page,
         "per_page": per_page,
@@ -174,17 +184,19 @@ def get_items():
         "data": paginated_data
     })
 
-# Error: Unauthorized
+# Error handler: Unauthorized
 @app.errorhandler(401)
 def unauthorized(e):
     return jsonify({"error": str(e)}), 401
 
-# Error: Rate limit
+# Error handler: Rate limit exceeded
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
     return jsonify({"error": "Rate limit exceeded"}), 429
 
+# Run the app
 if __name__ == "__main__":
     app.run()
+
 
 
